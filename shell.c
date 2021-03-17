@@ -7,12 +7,16 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <dirent.h>
 #define ARRAY_SIZE 1024
 #define NUM_BUILT_INS 7
 #define CWD_ERROR "--> ERROR: Cannot get CWD\n"
 #define FORK_ERROR "--> ERROR: Fork function failed\n"
 #define EXEC_ERROR "--> ERROR: Exec function failed\n"
 #define WAIT_ERROR "--> ERROR: Wait function failed\n"
+#define CD_ERROR "--> ERROR: Cannot change directory\n"
+#define DIR_ERROR "--> ERROR: Directory cannot be opened\n"
 #define DELIM " \n"
 
 // Function Prototypes
@@ -22,6 +26,8 @@ void parse(char *, char *[]);
 void forkProgram(char *[], int);
 int checkBuiltIn(char *[]);
 int runBuiltIn(char *[]);
+int cdCommand(char *[]);
+int dirCommand(char *[]);
 
 // List of the built-in commands
 char *builtIns[] = { "cd", "clr", "dir", "environ",
@@ -44,6 +50,7 @@ int main(int argc, char argv[]) {
 			return EXIT_SUCCESS;
 		parse(input, args);
 		int test = checkBuiltIn(args);
+		test = runBuiltIn(args);
 	}
 }
 
@@ -51,10 +58,13 @@ int main(int argc, char argv[]) {
 // 		       otherwise will return an error message, will probably never happen
 void printCurrentDir() {
 	char cwd[ARRAY_SIZE];
-	if (getcwd(cwd, sizeof(cwd)) == NULL)
+	char host[ARRAY_SIZE];
+	if (getcwd(cwd, sizeof(cwd)) == NULL) {
 		printf( "%s", CWD_ERROR );
-	else
-		printf( "%s\n", cwd );
+	} else {
+		gethostname(host, ARRAY_SIZE);
+		printf( "%s:%s~$ ", host, cwd );
+	}
 }
 
 // readLine() - Function takes in the input string from main and fills in
@@ -107,12 +117,9 @@ void forkProgram(char *args[], int flag) {
 //		    are for testing purposes and will be removed.
 int checkBuiltIn(char *args[]) {
 	for (int i = 0; i < (sizeof(builtIns) / sizeof(builtIns[0])); i++) {
-		if (strcmp(args[0], builtIns[i]) == 0) {
-			printf( "Is a built in function\n" );
+		if (strcmp(args[0], builtIns[i]) == 0)
 			return 1;
-		}
-	} printf( "Is NOT a built in function\n" );
-	return 0;
+	} return 0;
 }
 
 // runBuiltIn() - Runs the built in commands using if statements, there will be
@@ -120,9 +127,9 @@ int checkBuiltIn(char *args[]) {
 //		  to what the user types in, and what is in the argument vector.
 //		  Each command function will accept the argument vector as input.
 int runBuiltIn(char *args[]) {
-	if (strcmp(args[0], "cd") == 0)
-		printf( "Run change directory\n" );
-	else if (strcmp(args[0], "pause") == 0)
+	if (strcmp(args[0], "cd") == 0) {
+		cdCommand(args);
+	} else if (strcmp(args[0], "pause") == 0)
 		printf( "Pause shell\n" );
 	else if (strcmp(args[0], "quit") == 0)
 		printf( "Quitting shell\n" );
@@ -133,10 +140,38 @@ int runBuiltIn(char *args[]) {
 	else if (strcmp(args[0], "environ") == 0)
 		printf( "Run environment command\n" );
 	else if (strcmp(args[0], "dir") == 0)
-		printf( "Print directory contents\n" );
+		dirCommand(args);
 	else if (strcmp(args[0], "echo") == 0)
 		printf( "Run echo command\n" );
 	else if (strcmp(args[0], "cd") == 0)
 		printf( "Change directory\n" );
 	return 0;
+}
+
+int cdCommand(char *args[]) {
+	if (args[1] == NULL) {
+		char cwd[ARRAY_SIZE];
+        	getcwd(cwd, sizeof(cwd));
+                printf( "\n%s\n", cwd );
+		return 0;
+	} else {
+		if (chdir(args[1]) != 0)
+			printf( "%s", CD_ERROR );
+	} return 0;
+}
+
+int dirCommand(char *args[]) {
+	char path[ARRAY_SIZE];
+	getcwd(path, sizeof(path));
+	DIR *directory;
+	struct dirent *bat;
+	if ((directory = opendir(path)) == NULL)
+		printf( "%s", DIR_ERROR );
+	else {
+		int k = 0;
+		while ((bat = readdir(directory)) != NULL) {
+			printf( "%s\n", bat->d_name );
+			k++;
+		} closedir(directory);
+	} return 0;
 }
