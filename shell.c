@@ -8,6 +8,7 @@
 #include <sys/wait.h>
 #include <sys/ioctl.h>
 #define ARRAY_SIZE 1024
+#define NUM_BUILT_INS 7
 #define CWD_ERROR "--> ERROR: Cannot get CWD\n"
 #define FORK_ERROR "--> ERROR: Fork function failed\n"
 #define EXEC_ERROR "--> ERROR: Exec function failed\n"
@@ -19,6 +20,12 @@ void printCurrentDir();
 void readLine(char *);
 void parse(char *, char *[]);
 void forkProgram(char *[], int);
+int checkBuiltIn(char *[]);
+int runBuiltIn(char *[]);
+
+// List of the built-in commands
+char *builtIns[] = { "cd", "clr", "dir", "environ",
+		     "echo", "help", "pause" };
 
 // Main function - invocation of all other functions
 //		   input string is the input from the user
@@ -36,7 +43,7 @@ int main(int argc, char argv[]) {
 		if (strcmp(input, "quit") == 0 || feof(stdin))
 			return EXIT_SUCCESS;
 		parse(input, args);
-		forkProgram(args, 0);
+		int test = checkBuiltIn(args);
 	}
 }
 
@@ -92,4 +99,44 @@ void forkProgram(char *args[], int flag) {
 			printf( "%s", WAIT_ERROR );
 		}
 	}
+}
+
+// checkBuiltIn() - Function will check the user input to see if the input is
+//		    in fact a built in function or not, and will return a flag
+// 		    designating whether or not it is a built in. The print statements
+//		    are for testing purposes and will be removed.
+int checkBuiltIn(char *args[]) {
+	for (int i = 0; i < (sizeof(builtIns) / sizeof(builtIns[0])); i++) {
+		if (strcmp(args[0], builtIns[i]) == 0) {
+			printf( "Is a built in function\n" );
+			return 1;
+		}
+	} printf( "Is NOT a built in function\n" );
+	return 0;
+}
+
+// runBuiltIn() - Runs the built in commands using if statements, there will be
+//		  individual functions for each command, that will be called according
+//		  to what the user types in, and what is in the argument vector.
+//		  Each command function will accept the argument vector as input.
+int runBuiltIn(char *args[]) {
+	if (strcmp(args[0], "cd") == 0)
+		printf( "Run change directory\n" );
+	else if (strcmp(args[0], "pause") == 0)
+		printf( "Pause shell\n" );
+	else if (strcmp(args[0], "quit") == 0)
+		printf( "Quitting shell\n" );
+	else if (strcmp(args[0], "help") == 0)
+		printf( "Open help menu\n" );
+	else if (strcmp(args[0], "clr") == 0)
+		printf( "Clear the screen\n" );
+	else if (strcmp(args[0], "environ") == 0)
+		printf( "Run environment command\n" );
+	else if (strcmp(args[0], "dir") == 0)
+		printf( "Print directory contents\n" );
+	else if (strcmp(args[0], "echo") == 0)
+		printf( "Run echo command\n" );
+	else if (strcmp(args[0], "cd") == 0)
+		printf( "Change directory\n" );
+	return 0;
 }
