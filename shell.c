@@ -11,12 +11,16 @@
 #include <dirent.h>
 #define ARRAY_SIZE 1024
 #define NUM_BUILT_INS 7
+#define HELP_FILE "manfile.txt"
 #define CWD_ERROR "--> ERROR: Cannot get CWD\n"
 #define FORK_ERROR "--> ERROR: Fork function failed\n"
 #define EXEC_ERROR "--> ERROR: Exec function failed\n"
 #define WAIT_ERROR "--> ERROR: Wait function failed\n"
 #define CD_ERROR "--> ERROR: Cannot change directory\n"
 #define DIR_ERROR "--> ERROR: Directory cannot be opened\n"
+#define PAUSE_MESSAGE "Shell paused... Press enter to continue\n"
+#define RESUME_MESSAGE "Shell has resumed\n"
+#define FILE_OPEN_ERROR "--> ERROR: File cannot be opened\n"
 #define DELIM " \n"
 
 // Function Prototypes
@@ -28,10 +32,16 @@ int checkBuiltIn(char *[]);
 int runBuiltIn(char *[]);
 int cdCommand(char *[]);
 int dirCommand(char *[]);
+int pauseCommand(char *[]);
+int echoCommand(char *[]);
+int clearCommand(char *[]);
+int helpCommand(char *[]);
+int environCommand(char *[]);
 
 // List of the built-in commands
 char *builtIns[] = { "cd", "clr", "dir", "environ",
 		     "echo", "help", "pause" };
+extern char **environ;
 
 // Main function - invocation of all other functions
 //		   input string is the input from the user
@@ -130,24 +140,26 @@ int runBuiltIn(char *args[]) {
 	if (strcmp(args[0], "cd") == 0) {
 		cdCommand(args);
 	} else if (strcmp(args[0], "pause") == 0)
-		printf( "Pause shell\n" );
+		pauseCommand(args);
 	else if (strcmp(args[0], "quit") == 0)
 		printf( "Quitting shell\n" );
 	else if (strcmp(args[0], "help") == 0)
-		printf( "Open help menu\n" );
+		helpCommand(args);
 	else if (strcmp(args[0], "clr") == 0)
-		printf( "Clear the screen\n" );
+		clearCommand(args);
 	else if (strcmp(args[0], "environ") == 0)
-		printf( "Run environment command\n" );
+		environCommand(args);
 	else if (strcmp(args[0], "dir") == 0)
 		dirCommand(args);
 	else if (strcmp(args[0], "echo") == 0)
-		printf( "Run echo command\n" );
-	else if (strcmp(args[0], "cd") == 0)
-		printf( "Change directory\n" );
+		echoCommand(args);
 	return 0;
 }
 
+// cdCommand() - changes the directory by calling the chdir command, if
+//		 the user only types cd, then the cwd is printed, otherwise
+//		 will call the chdir function and if it fails, will print
+//		 an error message, otherwise will change the directory
 int cdCommand(char *args[]) {
 	if (args[1] == NULL) {
 		char cwd[ARRAY_SIZE];
@@ -160,6 +172,8 @@ int cdCommand(char *args[]) {
 	} return 0;
 }
 
+// dirCommand() - opens the directory, and prints the contents of it
+//		  one after the other, then closes the directory
 int dirCommand(char *args[]) {
 	char path[ARRAY_SIZE];
 	getcwd(path, sizeof(path));
@@ -173,5 +187,81 @@ int dirCommand(char *args[]) {
 			printf( "%s\n", bat->d_name );
 			k++;
 		} closedir(directory);
+	} return 0;
+}
+
+// pauseCommand() - command will pause the shell, and will continue to be
+//		    paused until the user types in ENTER or \n key
+int pauseCommand(char *args[]) {
+	char input[ARRAY_SIZE];
+	do {
+		printf( "%s", PAUSE_MESSAGE );
+		fgets(input, sizeof(input), stdin);
+	} while (strcmp(input, "\n") != 0);
+	printf( "%s", RESUME_MESSAGE );
+}
+
+// echoCommand() - will take input by the user and echo it to the screen,
+//		   or print it to the screen
+int echoCommand(char *args[]) {
+	int i = 1;
+	while (args[i] != NULL)
+		printf( "%s ", args[i++] );
+	printf( "\n" );
+}
+
+// clearCommand() - uses the ioctl header to call functions that get the size
+//		    of the window, and clears the screen, putting the prompt
+//		    up at the top of the screen
+int clearCommand(char *args[]) {
+	int i;
+	struct winsize w;
+	ioctl(0, TIOCGWINSZ, &w);
+	for (i = 0; i < w.ws_row; i++)
+		puts("");
+	printf( "\033[%dA", w.ws_row );
+}
+
+// helpCommand() - clears the screen, and then calls the manual text file that contains
+//		   information about the shell itself and how to use it
+int helpCommand(char *args[]) {
+	int test = clearCommand(args);
+	int i = 0;
+	struct winsize w;
+	ioctl(0, TIOCGWINSZ, &w);
+	char manFileLine[ARRAY_SIZE];
+	FILE *file = fopen( HELP_FILE, "r" );
+	if (file == NULL) {
+		printf( "%s", FILE_OPEN_ERROR );
+		return 0;
+	}
+	while (fgets(manFileLine, ARRAY_SIZE, file) != NULL) {
+		printf( "%s", manFileLine );
+		i++;
+		if (i == w.ws_row - 1) {
+			char input[ARRAY_SIZE];
+			while (fgets(manFileLine, ARRAY_SIZE, file) != NULL) {
+				fgets(input, sizeof(input), stdin);
+				if (strcmp(input, "\n") == 0) {
+					char *token = strtok(manFileLine, "\n");
+					printf( "%s", manFileLine );
+				}
+				if (strcmp(input, "q\n") == 0) {
+					fclose(file);
+					return 1;
+				}
+			} fclose(file);
+			return 1;
+		}
+	}
+}
+
+// environCommand() - function that prints the environment variables, such
+//		      as global and local variables
+int environCommand(char *args[]) {
+	char *environVariable = *environ;
+	for (int i = 1; environVariable; i++) {
+		printf( "%s\n", environVariable );
+		environVariable = *(environ + i);
 	} return 0;
 }
