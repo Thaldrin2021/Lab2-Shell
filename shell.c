@@ -36,6 +36,7 @@ int runBuiltIn(char *[]);
 int checkRedirect(char *[], int);
 void redirect(char *[], int, int);
 int checkPipe(char *[], char *[], char *[]);
+void evaluatePipe(char *[], char *[], int);
 int cdCommand(char *[]);
 int dirCommand(char *[]);
 int pauseCommand(char *[]);
@@ -197,7 +198,7 @@ int checkRedirect(char *args[], int flag) {
 	char *right[ARRAY_SIZE];
 	for (int i = 0; args[i] != NULL; i++) {
 		if (checkPipe(args, left, right) == 1) {
-			printf( "Evaluate the Pipe\n" );
+			evaluatePipe(left, right, flag);
 			return 2;
 		}
 		if (strcmp(args[i], ">") == 0) {
@@ -283,6 +284,51 @@ int checkPipe(char *args[], char *left[], char *right[]) {
 			} pipeFlag = 0;
 		} i++;
 	} return pipeFlag;
+}
+
+// evaluatePipe() - handles running the pipe command. Takes the left and the
+//		    right side of a command that was parsed in the previous function. Then runs two processes keeping track of them along the way
+void evaluatePipe(char *left[], char *right[], int flag) {
+	int fd[2];
+	pid_t pid1, pid2;
+	int savedin = dup(0);
+	int savedout = dup(1);
+	pipe(fd);
+	pid1 = fork();
+	if (pid1 < 0) {
+		printf( "%s", FORK_ERROR );
+		exit(1);
+	}
+	if (pid1 == 0) {
+		dup2(fd[1], STDOUT_FILENO);
+		close(fd[0]);
+		if (checkBuiltIn(left) == 1) {
+			runBuiltIn(left);
+		} else {
+			if (execvp(left[0], left) < 0)
+				printf( "%s", EXEC_ERROR );
+		}
+	} else {
+		pid2 = fork();
+		if (pid2 < 0) {
+			printf( "%s", FORK_ERROR );
+			exit(1);
+		} else if (pid2 == 0) {
+			dup2(fd[0], STDIN_FILENO);
+			close(fd[1]);
+			if (checkBuiltIn(right) == 1) {
+				runBuiltIn(right);
+			} else {
+				if (execvp(right[0], right) < 0)
+					printf( "%s", EXEC_ERROR );
+			}
+		} else if (pid2 > 2 && flag == 0) {
+			close(fd[0]);
+			close(fd[1]);
+			waitpid(pid1, NULL, 0);
+			waitpid(pid2, NULL, 0);
+		}
+	}
 }
 
 // cdCommand() - changes the directory by calling the chdir command, if
