@@ -26,6 +26,7 @@
 #define DELIM " \n"
 
 // Function Prototypes
+int evaluateInput(char *);
 void printCurrentDir();
 void readLine(char *);
 void parse(char *, char *[]);
@@ -34,7 +35,7 @@ int checkBuiltIn(char *[]);
 int runBuiltIn(char *[]);
 int checkRedirect(char *[], int);
 void redirect(char *[], int, int);
-int evaluateCases(char *);
+int checkPipe(char *[], char *[], char *[]);
 int cdCommand(char *[]);
 int dirCommand(char *[]);
 int pauseCommand(char *[]);
@@ -58,10 +59,40 @@ int argsNum;
 // 		   current directory over and over until quit
 int main(int argc, char argv[]) {
 	char input[ARRAY_SIZE];
-	while (1) {
+	system( "clear" );
+	do {
 		printCurrentDir();
 		readLine(input);
-	} return EXIT_SUCCESS;
+		int test = evaluateInput(input);
+	} while (strcmp(input, "quit") != 0);
+	return EXIT_SUCCESS;
+}
+
+// evaluateInput() - handles all the cases of the user input.
+//		     Takes as input the user input and parses it by calling the parse
+//		     function and tests it for each instance of a token
+int evaluateInput(char *input) {
+	char *args[ARRAY_SIZE];
+	int flag = 0;
+	parse(input, args);
+	if (strcmp(args[argsNum - 1], "&") == 0) {
+		flag = 1;
+		args[argsNum - 1] = NULL;
+	}
+	int test = checkRedirect(args, flag);
+	if (test == 2) {
+		return 1;
+	}
+	if (test == 0) {
+		if (args[0] == NULL) {
+			return 0;
+		} if (checkBuiltIn(args) == 1) {
+			runBuiltIn(args);
+		} else {
+			forkProgram(args, flag);
+			return 1;
+		} return 1;
+	}
 }
 
 // printCurrentDir() - Function uses unistd.h to get the currend working directory
@@ -97,7 +128,7 @@ void parse(char *input, char *args[]) {
 	while (token != NULL) {
 		token = strtok(NULL, DELIM);
 		args[argCount++] = token;
-	} argsNum = argCount;
+	} argsNum = argCount - 1;
 }
 
 // forkProgram() - This function will handle forking the process, creating
@@ -162,38 +193,97 @@ int runBuiltIn(char *args[]) {
 //		     finished yet
 int checkRedirect(char *args[], int flag) {
 	int redirectFlag = 0;
+	char *left[ARRAY_SIZE];
+	char *right[ARRAY_SIZE];
 	for (int i = 0; args[i] != NULL; i++) {
+		if (checkPipe(args, left, right) == 1) {
+			printf( "Evaluate the Pipe\n" );
+			return 2;
+		}
 		if (strcmp(args[i], ">") == 0) {
-			printf( "Contains redirect >\n" );
+			redirect(args, 1, i);
 			redirectFlag = 1;
 		}
 		if (strcmp(args[i], "<") == 0) {
-			printf( "Contains redirect <\n" );
+			redirect(args, 2, i);
 			redirectFlag = 1;
 		}
 		if (strcmp(args[i], ">>") == 0) {
-			printf( "Contains redirect >>\n" );
+			redirect(args, 3, i);
 			redirectFlag = 1;
 		}
 	} return redirectFlag;
 }
 
+// redirect() - this function will handle all redirecting from the command to
+//		the specified file, or to get input from the file, it all depends
+//		on the token that is entered in by the user
+void redirect(char *args[], int flag, int i) {
+	int j = i;
+	int in, out;
+	int savedin = dup(0);
+	int savedout = dup(1);
+	pid_t pid = fork();
+	if (pid < 0) {
+		printf( "%s", FORK_ERROR );
+	} else if (pid == 0) {
+		if (flag == 1) {
+			int output = open(args[j + 1], O_WRONLY|O_CREAT,S_IRWXU|S_IRWXG|S_IRWXO);
+			dup2(output, 1);
+			close(output);
+			args[j] = NULL;
+			args[j + 1] = NULL;
+			++j;
+		}
+		if (flag == 2) {
+			int input = open(args[j + 1], O_CREAT | O_RDONLY, 0666);
+			dup2(input, 0);
+			close(input);
+			args[j] = NULL;
+			args[j + 1] = NULL;
+			++j;
+		}
+		if (flag == 3) {
+			int output = open(args[j + 1], O_WRONLY | O_APPEND | O_CREAT, 0666);
+			dup2(output, 1);
+			close(output);
+			args[j] = NULL;
+			args[j + 1] = NULL;
+			++j;
+		} execvp(args[0], args);
+	} else if (pid > 0) {
+		waitpid(pid, NULL, WCONTINUED);
+	}
+	dup2(savedin, 0);
+	close(savedin);
+	dup2(savedout, 1);
+	close(savedout);
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// checkPipe() - checks for a pipe in the user's input, and if there is
+//		 then the left and right argument vectors will be filled
+//		 with the left and the right sides of the input by the user and will
+//		 be handled accordingly by calling the piping function
+int checkPipe(char *args[], char *left[], char *right[]) {
+	int pipeFlag = 0;
+	int i = 0, j, k;
+	while (args[i] != NULL) {
+		if (strcmp(args[i], "|") == 0) {
+			for (j = 0; j < i; j++) {
+				left[j] = malloc(sizeof(char) * sizeof(args[i]));
+				char *strArg = args[j];
+				left[j] = strArg;
+			}
+			int m = 0;
+			for (k = i + 1; k < argsNum; k++) {
+				right[m] = malloc(sizeof(char) * sizeof(args[k]));
+				char *strArg = args[k];
+				right[m] = strArg;
+				m++;
+			} pipeFlag = 0;
+		} i++;
+	} return pipeFlag;
+}
 
 // cdCommand() - changes the directory by calling the chdir command, if
 //		 the user only types cd, then the cwd is printed, otherwise
