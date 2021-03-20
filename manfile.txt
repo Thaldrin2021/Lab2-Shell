@@ -1,0 +1,44 @@
+Description:
+myShell is written in C. It takes in commands from the users as input, or as input from a batchfile. Can run any of the
+built-in commands or can run other non-builtin commands using forking and executing.
+
+Built-In Commands:
+
+Command			Description
+
+cd			cd <directory name> allows for the current working directory to change
+
+clr			clr command will clear the screen on the terminal that is running the shell
+
+dir			dir <directory name> will list all items currently in the directory that the user
+			is currently on, subdirectories or files
+
+environ			environ will list all the environment variables for the directory
+
+echo			echo <user input> will print the string for all arguments after "echo" as a new string
+			with each line.
+
+help			help command will display the MANFILE. Listing all the commands as well as a brief description
+			of each function, describing its implementation and how it works
+
+pause			pause command will pause the shell prompting the user over and over again until they
+			hit the enter key
+
+quit			quit will exit the shell, giving a message at the end at termination
+
+Background Execution (&):
+	When executing a command normally, the parent process will create a child process, start executing, 
+	but it will wait for the child process to terminate. In the case of a background process, it will
+	begin the same way but the parent process will not wait for the child process to finish. 
+
+Example of background execution:
+	/Thaldrin/Desktop/Shell> <command> <process to run in background> &
+
+Piping:
+	Pipe uses send & blocking receive operations. Pipes follow the FIFO queue style, and allow the suer to 
+	pass file contents to a command. Pipes allow the user to move information between different parameters
+	and chain things together.
+
+Redirection:
+	The shell also supports input/output redirection. If the user types < filename or > filename, the stdin
+	and stdout of the shell will change for the current process. Input/output will then come from/go to a file
