@@ -1,13 +1,15 @@
 // Preprocessor Directives
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <time.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <sys/ioctl.h>
+#include <sys/wait.h>
+#include <stdlib.h>
+#include <time.h>
+#include <sys/time.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <dirent.h>
 #define ARRAY_SIZE 1024
 #define NUM_BUILT_INS 7
@@ -30,6 +32,9 @@ void parse(char *, char *[]);
 void forkProgram(char *[], int);
 int checkBuiltIn(char *[]);
 int runBuiltIn(char *[]);
+int checkRedirect(char *[], int);
+void redirect(char *[], int, int);
+int evaluateCases(char *);
 int cdCommand(char *[]);
 int dirCommand(char *[]);
 int pauseCommand(char *[]);
@@ -42,6 +47,7 @@ int environCommand(char *[]);
 char *builtIns[] = { "cd", "clr", "dir", "environ",
 		     "echo", "help", "pause" };
 extern char **environ;
+int argsNum;
 
 // Main function - invocation of all other functions
 //		   input string is the input from the user
@@ -52,16 +58,10 @@ extern char **environ;
 // 		   current directory over and over until quit
 int main(int argc, char argv[]) {
 	char input[ARRAY_SIZE];
-	char *args[ARRAY_SIZE];
 	while (1) {
 		printCurrentDir();
 		readLine(input);
-		if (strcmp(input, "quit") == 0 || feof(stdin))
-			return EXIT_SUCCESS;
-		parse(input, args);
-		int test = checkBuiltIn(args);
-		test = runBuiltIn(args);
-	}
+	} return EXIT_SUCCESS;
 }
 
 // printCurrentDir() - Function uses unistd.h to get the currend working directory
@@ -97,7 +97,7 @@ void parse(char *input, char *args[]) {
 	while (token != NULL) {
 		token = strtok(NULL, DELIM);
 		args[argCount++] = token;
-	}
+	} argsNum = argCount;
 }
 
 // forkProgram() - This function will handle forking the process, creating
@@ -155,6 +155,45 @@ int runBuiltIn(char *args[]) {
 		echoCommand(args);
 	return 0;
 }
+
+// checkRedirect() - Will check the input by the user to see if there is any redirection parts
+//		     of the input, and if so will run the redirect function for each. For now
+//		     it is simply print statements because the redirect function hasn't been
+//		     finished yet
+int checkRedirect(char *args[], int flag) {
+	int redirectFlag = 0;
+	for (int i = 0; args[i] != NULL; i++) {
+		if (strcmp(args[i], ">") == 0) {
+			printf( "Contains redirect >\n" );
+			redirectFlag = 1;
+		}
+		if (strcmp(args[i], "<") == 0) {
+			printf( "Contains redirect <\n" );
+			redirectFlag = 1;
+		}
+		if (strcmp(args[i], ">>") == 0) {
+			printf( "Contains redirect >>\n" );
+			redirectFlag = 1;
+		}
+	} return redirectFlag;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // cdCommand() - changes the directory by calling the chdir command, if
 //		 the user only types cd, then the cwd is printed, otherwise
